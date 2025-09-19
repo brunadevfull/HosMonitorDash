@@ -9,7 +9,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Server management routes
   app.get("/api/servers", async (req, res) => {
     try {
-      const servers = await storage.getServersWithLatestMetrics();
+      const servers = await storage.getPublicServersWithLatestMetrics();
       res.json(servers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch servers" });
@@ -18,7 +18,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/servers/:id", async (req, res) => {
     try {
-      const server = await storage.getServer(req.params.id);
+      const server = await storage.getPublicServer(req.params.id);
       if (!server) {
         return res.status(404).json({ message: "Server not found" });
       }
@@ -34,7 +34,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertServerSchema.parse(req.body);
       const server = await storage.createServer(validatedData);
-      res.status(201).json(server);
+      // Return sanitized server data without SSH credentials
+      const publicServer = await storage.getPublicServer(server.id);
+      res.status(201).json(publicServer);
     } catch (error) {
       res.status(400).json({ message: "Invalid server data" });
     }
@@ -47,7 +49,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!server) {
         return res.status(404).json({ message: "Server not found" });
       }
-      res.json(server);
+      // Return sanitized server data without SSH credentials
+      const publicServer = await storage.getPublicServer(server.id);
+      res.json(publicServer);
     } catch (error) {
       res.status(400).json({ message: "Invalid server data" });
     }
@@ -179,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         switch (data.type) {
           case 'subscribe_servers':
             // Client wants to subscribe to server updates
-            const servers = await storage.getServersWithLatestMetrics();
+            const servers = await storage.getPublicServersWithLatestMetrics();
             ws.send(JSON.stringify({
               type: 'servers_update',
               data: servers
@@ -299,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Broadcast updates to all connected clients
-      const updatedServers = await storage.getServersWithLatestMetrics();
+      const updatedServers = await storage.getPublicServersWithLatestMetrics();
       const activeAlerts = await storage.getActiveAlerts();
       
       wss.clients.forEach((client) => {

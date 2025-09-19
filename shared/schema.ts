@@ -88,7 +88,15 @@ export type Alert = typeof alerts.$inferSelect;
 export type InsertSshSession = z.infer<typeof insertSshSessionSchema>;
 export type SshSession = typeof sshSessions.$inferSelect;
 
+// Public server type that excludes sensitive SSH credentials
+export type PublicServer = Omit<Server, 'sshPassword' | 'sshPrivateKey'>;
+
 export type ServerWithMetrics = Server & {
+  metrics?: ServerMetrics;
+  alerts?: Alert[];
+};
+
+export type PublicServerWithMetrics = PublicServer & {
   metrics?: ServerMetrics;
   alerts?: Alert[];
 };

@@ -1,10 +1,12 @@
-import { type Server, type InsertServer, type ServerMetrics, type InsertMetrics, type Alert, type InsertAlert, type SshSession, type InsertSshSession, type ServerWithMetrics } from "@shared/schema";
+import { type Server, type InsertServer, type ServerMetrics, type InsertMetrics, type Alert, type InsertAlert, type SshSession, type InsertSshSession, type ServerWithMetrics, type PublicServer, type PublicServerWithMetrics } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Server operations
   getServers(): Promise<Server[]>;
+  getPublicServers(): Promise<PublicServer[]>;
   getServer(id: string): Promise<Server | undefined>;
+  getPublicServer(id: string): Promise<PublicServer | undefined>;
   getServersByEnvironment(environment: string): Promise<Server[]>;
   createServer(server: InsertServer): Promise<Server>;
   updateServer(id: string, server: Partial<InsertServer>): Promise<Server | undefined>;
@@ -15,6 +17,7 @@ export interface IStorage {
   getLatestServerMetrics(serverId: string): Promise<ServerMetrics | undefined>;
   createMetrics(metrics: InsertMetrics): Promise<ServerMetrics>;
   getServersWithLatestMetrics(): Promise<ServerWithMetrics[]>;
+  getPublicServersWithLatestMetrics(): Promise<PublicServerWithMetrics[]>;
   
   // Alert operations
   getAlerts(): Promise<Alert[]>;
@@ -229,12 +232,27 @@ export class MemStorage implements IStorage {
     });
   }
 
+  // Utility function to sanitize server data by removing sensitive SSH credentials
+  private sanitizeServer(server: Server): PublicServer {
+    const { sshPassword, sshPrivateKey, ...publicServer } = server;
+    return publicServer;
+  }
+
   async getServers(): Promise<Server[]> {
     return Array.from(this.servers.values());
   }
 
+  async getPublicServers(): Promise<PublicServer[]> {
+    return Array.from(this.servers.values()).map(server => this.sanitizeServer(server));
+  }
+
   async getServer(id: string): Promise<Server | undefined> {
     return this.servers.get(id);
+  }
+
+  async getPublicServer(id: string): Promise<PublicServer | undefined> {
+    const server = this.servers.get(id);
+    return server ? this.sanitizeServer(server) : undefined;
   }
 
   async getServersByEnvironment(environment: string): Promise<Server[]> {
@@ -313,6 +331,23 @@ export class MemStorage implements IStorage {
   async getServersWithLatestMetrics(): Promise<ServerWithMetrics[]> {
     const servers = await this.getServers();
     const serversWithMetrics: ServerWithMetrics[] = [];
+
+    for (const server of servers) {
+      const metrics = await this.getLatestServerMetrics(server.id);
+      const alerts = await this.getServerAlerts(server.id);
+      serversWithMetrics.push({
+        ...server,
+        metrics,
+        alerts,
+      });
+    }
+
+    return serversWithMetrics;
+  }
+
+  async getPublicServersWithLatestMetrics(): Promise<PublicServerWithMetrics[]> {
+    const servers = await this.getPublicServers();
+    const serversWithMetrics: PublicServerWithMetrics[] = [];
 
     for (const server of servers) {
       const metrics = await this.getLatestServerMetrics(server.id);
