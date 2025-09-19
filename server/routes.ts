@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertServerSchema, insertMetricsSchema, insertAlertSchema } from "@shared/schema";
+import { insertServerSchema, insertMetricsSchema, insertAlertSchema, insertServerLogSchema, insertLogMonitoringConfigSchema } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -161,6 +161,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Log monitoring routes
+  app.get("/api/servers/:id/logs", async (req, res) => {
+    try {
+      const { limit = 100, level } = req.query;
+      let logs;
+      
+      if (level && typeof level === 'string') {
+        logs = await storage.getServerLogsByLevel(req.params.id, level);
+      } else {
+        logs = await storage.getServerLogs(req.params.id, parseInt(limit as string));
+      }
+      
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch server logs" });
+    }
+  });
+
+  app.post("/api/servers/:id/logs", async (req, res) => {
+    try {
+      const validatedData = insertServerLogSchema.parse({
+        ...req.body,
+        serverId: req.params.id,
+      });
+      const log = await storage.createServerLog(validatedData);
+      res.status(201).json(log);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid log data" });
+    }
+  });
+
+  // Log monitoring configuration routes
+  app.get("/api/log-monitoring", async (req, res) => {
+    try {
+      const { serverId } = req.query;
+      const configs = await storage.getLogMonitoringConfigs(serverId as string);
+      res.json(configs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch log monitoring configs" });
+    }
+  });
+
+  app.post("/api/log-monitoring", async (req, res) => {
+    try {
+      const validatedData = insertLogMonitoringConfigSchema.parse(req.body);
+      const config = await storage.createLogMonitoringConfig(validatedData);
+      res.status(201).json(config);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid log monitoring config" });
+    }
+  });
+
+  app.put("/api/log-monitoring/:id", async (req, res) => {
+    try {
+      const validatedData = insertLogMonitoringConfigSchema.partial().parse(req.body);
+      const config = await storage.updateLogMonitoringConfig(req.params.id, validatedData);
+      if (!config) {
+        return res.status(404).json({ message: "Log monitoring config not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid log monitoring config data" });
+    }
+  });
+
+  app.delete("/api/log-monitoring/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteLogMonitoringConfig(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Log monitoring config not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete log monitoring config" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time updates
@@ -197,6 +274,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               type: 'alerts_update',
               data: alerts
             }));
+            break;
+            
+          case 'subscribe_logs':
+            // Client wants to subscribe to real-time logs for a specific server
+            const { serverId, limit = 50 } = data;
+            if (serverId) {
+              const logs = await storage.getServerLogs(serverId, limit);
+              ws.send(JSON.stringify({
+                type: 'logs_update',
+                serverId,
+                data: logs
+              }));
+            }
             break;
         }
       } catch (error) {

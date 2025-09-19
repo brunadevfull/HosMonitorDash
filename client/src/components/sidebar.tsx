@@ -7,7 +7,8 @@ import {
   Terminal, 
   Settings, 
   User,
-  Activity
+  Activity,
+  FileText
 } from "lucide-react";
 
 export function Sidebar() {
@@ -18,6 +19,7 @@ export function Sidebar() {
     { path: "/servers", label: "Servidores", icon: Server },
     { path: "/metrics", label: "Métricas", icon: BarChart3 },
     { path: "/alerts", label: "Alertas", icon: Bell, badge: "3" },
+    { path: "/logs", label: "Logs", icon: FileText },
     { path: "/ssh", label: "SSH Manager", icon: Terminal },
     { path: "/settings", label: "Configurações", icon: Settings },
   ];

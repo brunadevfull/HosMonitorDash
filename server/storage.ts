@@ -1,5 +1,6 @@
-import { type Server, type InsertServer, type ServerMetrics, type InsertMetrics, type Alert, type InsertAlert, type SshSession, type InsertSshSession, type ServerWithMetrics, type PublicServer, type PublicServerWithMetrics } from "@shared/schema";
+import { type Server, type InsertServer, type ServerMetrics, type InsertMetrics, type Alert, type InsertAlert, type SshSession, type InsertSshSession, type ServerLog, type InsertServerLog, type LogMonitoringConfig, type InsertLogMonitoringConfig, type ServerWithMetrics, type PublicServer, type PublicServerWithMetrics } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { DatabaseStorage } from "./database-storage";
 
 export interface IStorage {
   // Server operations
@@ -31,6 +32,15 @@ export interface IStorage {
   getActiveSshSessions(): Promise<SshSession[]>;
   createSshSession(session: InsertSshSession): Promise<SshSession>;
   endSshSession(id: string): Promise<SshSession | undefined>;
+  
+  // Log Monitoring operations
+  getServerLogs(serverId: string, limit?: number): Promise<ServerLog[]>;
+  getServerLogsByLevel(serverId: string, logLevel: string): Promise<ServerLog[]>;
+  createServerLog(log: InsertServerLog): Promise<ServerLog>;
+  getLogMonitoringConfigs(serverId?: string): Promise<LogMonitoringConfig[]>;
+  createLogMonitoringConfig(config: InsertLogMonitoringConfig): Promise<LogMonitoringConfig>;
+  updateLogMonitoringConfig(id: string, config: Partial<InsertLogMonitoringConfig>): Promise<LogMonitoringConfig | undefined>;
+  deleteLogMonitoringConfig(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -440,6 +450,66 @@ export class MemStorage implements IStorage {
     this.sshSessions.set(id, endedSession);
     return endedSession;
   }
+
+  // Log Monitoring operations (stub implementations for interface compliance)
+  async getServerLogs(serverId: string, limit?: number): Promise<ServerLog[]> {
+    // MemStorage doesn't support log monitoring - return empty array
+    return [];
+  }
+
+  async getServerLogsByLevel(serverId: string, logLevel: string): Promise<ServerLog[]> {
+    // MemStorage doesn't support log monitoring - return empty array
+    return [];
+  }
+
+  async createServerLog(log: InsertServerLog): Promise<ServerLog> {
+    // MemStorage doesn't support log monitoring - throw error
+    throw new Error("Log monitoring not supported in MemStorage");
+  }
+
+  async getLogMonitoringConfigs(serverId?: string): Promise<LogMonitoringConfig[]> {
+    // MemStorage doesn't support log monitoring - return empty array
+    return [];
+  }
+
+  async createLogMonitoringConfig(config: InsertLogMonitoringConfig): Promise<LogMonitoringConfig> {
+    // MemStorage doesn't support log monitoring - throw error
+    throw new Error("Log monitoring configuration not supported in MemStorage");
+  }
+
+  async updateLogMonitoringConfig(id: string, config: Partial<InsertLogMonitoringConfig>): Promise<LogMonitoringConfig | undefined> {
+    // MemStorage doesn't support log monitoring - return undefined
+    return undefined;
+  }
+
+  async deleteLogMonitoringConfig(id: string): Promise<boolean> {
+    // MemStorage doesn't support log monitoring - return false
+    return false;
+  }
 }
 
-export const storage = new MemStorage();
+// Create single instance of database storage
+const databaseStorage = new DatabaseStorage();
+
+// Initialize database and seed if needed
+async function initializeStorage() {
+  // Check if database is seeded by trying to get servers
+  try {
+    const existingServers = await databaseStorage.getServers();
+    if (existingServers.length === 0) {
+      console.log("No servers found, seeding database...");
+      const { seedDatabase } = await import("./seed");
+      await seedDatabase();
+    } else {
+      console.log(`Database already seeded with ${existingServers.length} servers`);
+    }
+  } catch (error) {
+    console.error("Error initializing storage:", error);
+  }
+}
+
+// Export the storage instance - using database storage for persistence
+export const storage = databaseStorage;
+
+// Auto-seed the database on startup
+initializeStorage().catch(console.error);

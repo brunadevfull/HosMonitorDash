@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import Servers from "@/pages/servers";
 import Metrics from "@/pages/metrics";
 import Alerts from "@/pages/alerts";
+import { LogsPage } from "@/pages/logs";
 import SshManager from "@/pages/ssh-manager";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/servers" component={Servers} />
       <Route path="/metrics" component={Metrics} />
       <Route path="/alerts" component={Alerts} />
+      <Route path="/logs" component={LogsPage} />
       <Route path="/ssh" component={SshManager} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />

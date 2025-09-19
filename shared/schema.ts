@@ -56,6 +56,29 @@ export const sshSessions = pgTable("ssh_sessions", {
   endedAt: timestamp("ended_at"),
 });
 
+export const serverLogs = pgTable("server_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serverId: varchar("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  logLevel: text("log_level").notNull(), // info, warning, error, debug
+  logSource: text("log_source").notNull(), // system, application, security, etc
+  message: text("message").notNull(),
+  originalLogPath: text("original_log_path"), // original log file path on server
+  metadata: jsonb("metadata").default({}), // additional log context
+  timestamp: timestamp("timestamp").notNull().default(sql`now()`),
+});
+
+export const logMonitoringConfig = pgTable("log_monitoring_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serverId: varchar("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  logPath: text("log_path").notNull(), // path to log file on server
+  logType: text("log_type").notNull(), // system, nginx, apache, mysql, etc
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  filterPattern: text("filter_pattern"), // regex pattern for filtering
+  alertOnError: boolean("alert_on_error").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
 export const insertServerSchema = createInsertSchema(servers).omit({
   id: true,
   createdAt: true,
@@ -79,6 +102,17 @@ export const insertSshSessionSchema = createInsertSchema(sshSessions).omit({
   endedAt: true,
 });
 
+export const insertServerLogSchema = createInsertSchema(serverLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertLogMonitoringConfigSchema = createInsertSchema(logMonitoringConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertServer = z.infer<typeof insertServerSchema>;
 export type Server = typeof servers.$inferSelect;
 export type InsertMetrics = z.infer<typeof insertMetricsSchema>;
@@ -87,6 +121,10 @@ export type InsertAlert = z.infer<typeof insertAlertSchema>;
 export type Alert = typeof alerts.$inferSelect;
 export type InsertSshSession = z.infer<typeof insertSshSessionSchema>;
 export type SshSession = typeof sshSessions.$inferSelect;
+export type InsertServerLog = z.infer<typeof insertServerLogSchema>;
+export type ServerLog = typeof serverLogs.$inferSelect;
+export type InsertLogMonitoringConfig = z.infer<typeof insertLogMonitoringConfigSchema>;
+export type LogMonitoringConfig = typeof logMonitoringConfig.$inferSelect;
 
 // Public server type that excludes sensitive SSH credentials
 export type PublicServer = Omit<Server, 'sshPassword' | 'sshPrivateKey'>;

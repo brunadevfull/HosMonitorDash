@@ -2,9 +2,10 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { ServerWithMetrics, Alert } from "@shared/schema";
 
 interface WebSocketMessage {
-  type: "connected" | "servers_update" | "alerts_update";
+  type: "connected" | "servers_update" | "alerts_update" | "logs_update";
   message?: string;
-  data?: ServerWithMetrics[] | Alert[];
+  data?: ServerWithMetrics[] | Alert[] | any[];
+  serverId?: string;
 }
 
 interface UseWebSocketReturn {

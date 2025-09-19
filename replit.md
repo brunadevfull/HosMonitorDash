@@ -22,16 +22,17 @@ Preferred communication style: Simple, everyday language.
 ### Backend Architecture
 - **Framework**: Express.js with TypeScript
 - **API Design**: RESTful API endpoints for CRUD operations on servers, metrics, alerts, and SSH sessions
-- **Storage**: In-memory storage implementation with interface for future database integration
+- **Storage**: PostgreSQL database persistence using Drizzle ORM with automatic seeding
 - **WebSocket Server**: Real-time communication for live updates to connected clients
 - **Development Server**: Vite middleware integration for hot module replacement during development
 
 ### Data Storage Solutions
-- **Current**: In-memory storage using JavaScript Maps for development/testing
-- **Database Ready**: Drizzle ORM configured for PostgreSQL with complete schema definitions
+- **Database**: PostgreSQL database with full persistence (migrated from in-memory storage)
+- **ORM**: Drizzle ORM with type-safe queries and automatic schema synchronization
 - **Database Provider**: Neon Database (serverless PostgreSQL) via `@neondatabase/serverless`
-- **Schema**: Comprehensive database schema including servers, metrics, alerts, and SSH sessions tables
-- **Migrations**: Drizzle Kit configured for database schema management
+- **Schema**: Complete database schema with servers, metrics, alerts, and SSH sessions tables
+- **Auto-seeding**: Automatic database initialization with Portuguese sample data on first startup
+- **Migrations**: Drizzle Kit handles schema synchronization with `npm run db:push`
 
 ### Authentication and Authorization
 - **Current State**: No authentication implemented (development setup)
