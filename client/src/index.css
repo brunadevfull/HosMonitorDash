@@ -1,0 +1,299 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(220, 14%, 96%);
+  --foreground: hsl(220, 9%, 9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(220, 9%, 9%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(220, 9%, 9%);
+  --primary: hsl(221, 83%, 53%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 14%, 96%);
+  --secondary-foreground: hsl(220, 9%, 9%);
+  --muted: hsl(220, 14%, 96%);
+  --muted-foreground: hsl(220, 9%, 46%);
+  --accent: hsl(220, 14%, 96%);
+  --accent-foreground: hsl(220, 9%, 9%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --border: hsl(220, 13%, 91%);
+  --input: hsl(220, 13%, 91%);
+  --ring: hsl(221, 83%, 53%);
+  --chart-1: hsl(221, 83%, 53%);
+  --chart-2: hsl(159, 78%, 36%);
+  --chart-3: hsl(42, 93%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+  --sidebar: hsl(0, 0%, 100%);
+  --sidebar-foreground: hsl(220, 9%, 9%);
+  --sidebar-primary: hsl(221, 83%, 53%);
+  --sidebar-primary-foreground: hsl(210, 40%, 98%);
+  --sidebar-accent: hsl(220, 14%, 96%);
+  --sidebar-accent-foreground: hsl(220, 9%, 9%);
+  --sidebar-border: hsl(220, 13%, 91%);
+  --sidebar-ring: hsl(221, 83%, 53%);
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: 'Menlo', monospace;
+  --radius: 8px;
+  --shadow-2xs: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00);
+  --shadow-xs: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00);
+  --shadow-sm: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00), 0px 1px 2px -1px hsl(221, 83%, 53%, 0.00);
+  --shadow: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00), 0px 1px 2px -1px hsl(221, 83%, 53%, 0.00);
+  --shadow-md: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00), 0px 2px 4px -1px hsl(221, 83%, 53%, 0.00);
+  --shadow-lg: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00), 0px 4px 6px -1px hsl(221, 83%, 53%, 0.00);
+  --shadow-xl: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00), 0px 8px 10px -1px hsl(221, 83%, 53%, 0.00);
+  --shadow-2xl: 0px 2px 0px 0px hsl(221, 83%, 53%, 0.00);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+}
+
+.dark {
+  --background: hsl(220, 9%, 9%);
+  --foreground: hsl(210, 40%, 98%);
+  --card: hsl(220, 9%, 12%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --popover: hsl(220, 9%, 9%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --primary: hsl(221, 83%, 53%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 9%, 15%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --muted: hsl(220, 9%, 15%);
+  --muted-foreground: hsl(220, 9%, 65%);
+  --accent: hsl(220, 9%, 15%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --border: hsl(220, 9%, 20%);
+  --input: hsl(220, 9%, 20%);
+  --ring: hsl(221, 83%, 53%);
+  --chart-1: hsl(221, 83%, 53%);
+  --chart-2: hsl(159, 78%, 36%);
+  --chart-3: hsl(42, 93%, 56%);
+  --chart-4: hsl(147, 78%, 42%);
+  --chart-5: hsl(341, 75%, 51%);
+  --sidebar: hsl(220, 9%, 12%);
+  --sidebar-foreground: hsl(210, 40%, 98%);
+  --sidebar-primary: hsl(221, 83%, 53%);
+  --sidebar-primary-foreground: hsl(210, 40%, 98%);
+  --sidebar-accent: hsl(220, 9%, 15%);
+  --sidebar-accent-foreground: hsl(210, 40%, 98%);
+  --sidebar-border: hsl(220, 9%, 20%);
+  --sidebar-ring: hsl(221, 83%, 53%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .metric-progress {
+    transition: width 0.5s ease-in-out;
+  }
+  
+  .server-card {
+    transition: all 0.2s ease;
+  }
+  
+  .server-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  
+  .status-online { 
+    background-color: #16a34a; 
+  }
+  
+  .status-warning { 
+    background-color: #d97706; 
+  }
+  
+  .status-critical { 
+    background-color: #dc2626; 
+  }
+  
+  .status-offline { 
+    background-color: #6b7280; 
+  }
+  
+  .chart-container {
+    height: 200px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  .dark .chart-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #94a3b8;
+  }
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Terminal styles */
+.terminal {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  background-color: #000000;
+  color: #00ff00;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.terminal-input {
+  background-color: transparent;
+  border: none;
+  outline: none;
+  color: #00ff00;
+  font-family: inherit;
+  width: 100%;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Progress bar animations */
+.progress-bar {
+  transition: width 0.3s ease-in-out;
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.dark .card-hover:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Alert animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-enter {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Button focus styles */
+button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Input focus styles */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --background: hsl(0, 0%, 100%);
+    --foreground: hsl(0, 0%, 0%);
+    --border: hsl(0, 0%, 0%);
+  }
+
+  .dark {
+    --background: hsl(0, 0%, 0%);
+    --foreground: hsl(0, 0%, 100%);
+    --border: hsl(0, 0%, 100%);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .metric-progress,
+  .server-card,
+  .card-hover,
+  .progress-bar,
+  * {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
