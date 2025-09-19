@@ -264,6 +264,10 @@ export class MemStorage implements IStorage {
     const server: Server = {
       ...insertServer,
       id,
+      sshPort: insertServer.sshPort ?? 22,
+      environment: insertServer.environment ?? "production",
+      serverType: insertServer.serverType ?? "web",
+      isActive: insertServer.isActive ?? true,
       description: insertServer.description || null,
       sshUsername: insertServer.sshUsername || null,
       sshPassword: insertServer.sshPassword || null,
@@ -312,6 +316,7 @@ export class MemStorage implements IStorage {
     const metrics: ServerMetrics = {
       ...insertMetrics,
       id,
+      isOnline: insertMetrics.isOnline ?? false,
       cpuUsage: insertMetrics.cpuUsage || null,
       memoryUsage: insertMetrics.memoryUsage || null,
       diskUsage: insertMetrics.diskUsage || null,
@@ -379,6 +384,7 @@ export class MemStorage implements IStorage {
     const alert: Alert = {
       ...insertAlert,
       id,
+      isResolved: insertAlert.isResolved ?? false,
       threshold: insertAlert.threshold || null,
       currentValue: insertAlert.currentValue || null,
       createdAt: new Date(),
