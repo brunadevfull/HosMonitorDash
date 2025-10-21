@@ -1,15 +1,21 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
-import * as schema from "@shared/schema";
+// server/db.ts
+import 'dotenv/config';
 
-neonConfig.webSocketConstructor = ws;
+// ⬇️ em ESM, importe o default de 'pg' e extraia Pool
+import pg from 'pg';
+const { Pool } = pg;
+
+// ⬇️ troque o dialeto do Drizzle para node-postgres
+import { drizzle } from 'drizzle-orm/node-postgres';
+
+import * as schema from '@shared/schema';
 
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+  throw new Error('DATABASE_URL must be set. Did you forget to provision a database?');
 }
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+
+// node-postgres: a assinatura é (client, { schema })
+export const db = drizzle(pool, { schema });
+
