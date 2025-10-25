@@ -2,8 +2,20 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertServerSchema, insertMetricsSchema, insertAlertSchema, insertServerLogSchema, insertLogMonitoringConfigSchema } from "@shared/schema";
+import {
+  insertServerSchema,
+  insertMetricsSchema,
+  insertAlertSchema,
+  insertServerLogSchema,
+  insertLogMonitoringConfigSchema,
+  containerActionSchema,
+  serviceActionSchema,
+  createBackupSchema,
+  createLogExportSchema,
+  recordTelemetryEventSchema,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
+import { ZodError } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Server management routes
@@ -235,6 +247,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete log monitoring config" });
+    }
+  });
+
+  // Container orchestration routes
+  app.get("/api/container-stacks", async (_req, res) => {
+    try {
+      const stacks = await storage.getContainerStacks();
+      res.json(stacks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch container stacks" });
+    }
+  });
+
+  app.post("/api/container-stacks/:id/actions", async (req, res) => {
+    try {
+      const payload = containerActionSchema.parse(req.body);
+      const stack = await storage.performContainerAction(req.params.id, payload);
+      if (!stack) {
+        return res.status(404).json({ message: "Container stack not found" });
+      }
+      res.json(stack);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid container action payload" });
+      }
+      res.status(500).json({ message: "Failed to execute container action" });
+    }
+  });
+
+  // Service management routes
+  app.get("/api/services", async (_req, res) => {
+    try {
+      const services = await storage.getServiceProcesses();
+      res.json(services);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch services" });
+    }
+  });
+
+  app.post("/api/services/:id/actions", async (req, res) => {
+    try {
+      const payload = serviceActionSchema.parse(req.body);
+      const service = await storage.performServiceAction(req.params.id, payload);
+      if (!service) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid service action payload" });
+      }
+      res.status(500).json({ message: "Failed to execute service action" });
+    }
+  });
+
+  // Backup and log export tools
+  app.get("/api/maintenance/backups", async (_req, res) => {
+    try {
+      const backups = await storage.getBackupJobs();
+      res.json(backups);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch backups" });
+    }
+  });
+
+  app.post("/api/maintenance/backups", async (req, res) => {
+    try {
+      const payload = createBackupSchema.parse(req.body);
+      const backup = await storage.createBackupJob(payload);
+      res.status(201).json(backup);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid backup payload" });
+      }
+      res.status(500).json({ message: "Failed to create backup" });
+    }
+  });
+
+  app.get("/api/maintenance/log-exports", async (_req, res) => {
+    try {
+      const tasks = await storage.getLogExportTasks();
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch log export tasks" });
+    }
+  });
+
+  app.post("/api/maintenance/logs/export", async (req, res) => {
+    try {
+      const payload = createLogExportSchema.parse(req.body);
+      const task = await storage.createLogExportTask(payload);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid log export payload" });
+      }
+      res.status(500).json({ message: "Failed to export logs" });
+    }
+  });
+
+  // Telemetry routes
+  app.get("/api/telemetry/events", async (req, res) => {
+    try {
+      const limitParam = req.query.limit;
+      const parsedLimit = limitParam ? parseInt(limitParam as string, 10) : undefined;
+      const limit = parsedLimit && parsedLimit > 0 ? parsedLimit : undefined;
+      const events = await storage.getTelemetryEvents(limit);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch telemetry events" });
+    }
+  });
+
+  app.post("/api/telemetry/events", async (req, res) => {
+    try {
+      const payload = recordTelemetryEventSchema.parse(req.body);
+      const event = await storage.recordTelemetryEvent(payload);
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: "Invalid telemetry payload" });
+      }
+      res.status(500).json({ message: "Failed to record telemetry event" });
     }
   });
 

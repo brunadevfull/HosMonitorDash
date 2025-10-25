@@ -191,7 +191,12 @@ export function ServerForm({ server, onSuccess }: ServerFormProps) {
               <FormItem>
                 <FormLabel>Usuário SSH</FormLabel>
                 <FormControl>
-                  <Input placeholder="admin" {...field} data-testid="input-ssh-username" />
+                  <Input
+                    placeholder="admin"
+                    {...field}
+                    value={field.value ?? ""}
+                    data-testid="input-ssh-username"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

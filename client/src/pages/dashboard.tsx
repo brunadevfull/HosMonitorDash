@@ -21,20 +21,25 @@ export default function Dashboard() {
     );
   }
 
-  const filteredServers = servers?.filter(server => server.environment === activeEnvironment) || [];
-  const onlineServers = servers?.filter(server => server.metrics?.isOnline) || [];
-  const totalServers = servers?.length || 0;
-  const activeAlerts = servers?.reduce((acc, server) => acc + (server.alerts?.filter(alert => !alert.isResolved).length || 0), 0) || 0;
-  
-  const avgCpu = servers?.reduce((acc, server) => {
-    const cpu = parseFloat(server.metrics?.cpuUsage || "0");
-    return acc + cpu;
-  }, 0) / (servers?.length || 1);
+  const safeServers = servers ?? [];
+  const filteredServers = safeServers.filter(server => server.environment === activeEnvironment);
+  const onlineServers = safeServers.filter(server => server.metrics?.isOnline);
+  const totalServers = safeServers.length;
+  const activeAlerts = safeServers.reduce((acc, server) => acc + (server.alerts?.filter(alert => !alert.isResolved).length || 0), 0);
 
-  const avgMemory = servers?.reduce((acc, server) => {
-    const memory = parseFloat(server.metrics?.memoryUsage || "0");
-    return acc + memory;
-  }, 0) / (servers?.length || 1);
+  const avgCpu = safeServers.length > 0
+    ? safeServers.reduce((acc, server) => {
+        const cpu = parseFloat(server.metrics?.cpuUsage || "0");
+        return acc + cpu;
+      }, 0) / safeServers.length
+    : 0;
+
+  const avgMemory = safeServers.length > 0
+    ? safeServers.reduce((acc, server) => {
+        const memory = parseFloat(server.metrics?.memoryUsage || "0");
+        return acc + memory;
+      }, 0) / safeServers.length
+    : 0;
 
   const criticalAlerts = servers?.reduce((acc, server) => {
     const critical = server.alerts?.filter(alert => !alert.isResolved && alert.severity === "critical").length || 0;
@@ -44,9 +49,9 @@ export default function Dashboard() {
   const warningAlerts = activeAlerts - criticalAlerts;
 
   const environmentCounts = {
-    production: servers?.filter(s => s.environment === "production").length || 0,
-    staging: servers?.filter(s => s.environment === "staging").length || 0,
-    development: servers?.filter(s => s.environment === "development").length || 0,
+    production: safeServers.filter(s => s.environment === "production").length,
+    staging: safeServers.filter(s => s.environment === "staging").length,
+    development: safeServers.filter(s => s.environment === "development").length,
   };
 
   return (
