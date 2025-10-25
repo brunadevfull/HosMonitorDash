@@ -11,6 +11,7 @@ import Alerts from "@/pages/alerts";
 import { LogsPage } from "@/pages/logs";
 import SshManager from "@/pages/ssh-manager";
 import Settings from "@/pages/settings";
+import Orchestration from "@/pages/orchestration";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/alerts" component={Alerts} />
       <Route path="/logs" component={LogsPage} />
       <Route path="/ssh" component={SshManager} />
+      <Route path="/operations" component={Orchestration} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

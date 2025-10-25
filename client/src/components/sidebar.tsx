@@ -1,14 +1,15 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { 
-  Server, 
-  BarChart3, 
-  Bell, 
-  Terminal, 
-  Settings, 
+import {
+  Server,
+  BarChart3,
+  Bell,
+  Terminal,
+  Settings,
   User,
   Activity,
-  FileText
+  FileText,
+  Boxes
 } from "lucide-react";
 
 export function Sidebar() {
@@ -21,6 +22,7 @@ export function Sidebar() {
     { path: "/alerts", label: "Alertas", icon: Bell, badge: "3" },
     { path: "/logs", label: "Logs", icon: FileText },
     { path: "/ssh", label: "SSH Manager", icon: Terminal },
+    { path: "/operations", label: "Orquestração", icon: Boxes },
     { path: "/settings", label: "Configurações", icon: Settings },
   ];
 
