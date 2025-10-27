@@ -27,6 +27,7 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { DatabaseStorage } from "./database-storage";
+import { DockerUnavailableError, listDockerStacks, performDockerStackAction } from "./docker";
 
 export interface IStorage {
   // Server operations
@@ -92,7 +93,6 @@ export class MemStorage implements IStorage {
   private metrics: Map<string, ServerMetrics[]>;
   private alerts: Map<string, Alert>;
   private sshSessions: Map<string, SshSession>;
-  private containerStacks: Map<string, ContainerStack>;
   private serviceProcesses: Map<string, ServiceProcess>;
   private backupJobs: BackupJob[];
   private logExportTasks: LogExportTask[];
@@ -104,7 +104,6 @@ export class MemStorage implements IStorage {
     this.metrics = new Map();
     this.alerts = new Map();
     this.sshSessions = new Map();
-    this.containerStacks = new Map();
     this.serviceProcesses = new Map();
     this.backupJobs = [];
     this.logExportTasks = [];
@@ -302,109 +301,6 @@ export class MemStorage implements IStorage {
 
   private initializeOperationalData() {
     const now = new Date();
-
-    this.containerStacks.set("stack-papem", {
-      id: "stack-papem",
-      name: "PAPEM Core",
-      projectName: "papem-core",
-      path: "/opt/papem/docker-compose.yml",
-      status: "running",
-      updatedAt: new Date(now.getTime() - 5 * 60 * 1000),
-      lastAction: "Stack iniciado automaticamente",
-      primaryServerId: "server-1",
-      services: [
-        {
-          name: "api",
-          image: "papem/api:latest",
-          replicas: 2,
-          state: "running",
-          ports: ["8080:8080", "8443:8443"],
-          lastEvent: "Deploy aplicado há 10 minutos",
-        },
-        {
-          name: "worker",
-          image: "papem/worker:latest",
-          replicas: 1,
-          state: "running",
-          ports: [],
-          lastEvent: "Fila processada às 08:45",
-        },
-        {
-          name: "proxy",
-          image: "nginx:1.25",
-          replicas: 1,
-          state: "running",
-          ports: ["80:80", "443:443"],
-          lastEvent: "Reload executado às 08:40",
-        },
-      ],
-    });
-
-    this.containerStacks.set("stack-analytics", {
-      id: "stack-analytics",
-      name: "Analytics",
-      projectName: "papem-analytics",
-      path: "/srv/analytics/docker-compose.yml",
-      status: "degraded",
-      updatedAt: new Date(now.getTime() - 15 * 60 * 1000),
-      lastAction: "Serviço collector com falha",
-      primaryServerId: "server-3",
-      services: [
-        {
-          name: "collector",
-          image: "papem/collector:2.1",
-          replicas: 3,
-          state: "error",
-          ports: ["9000:9000"],
-          lastEvent: "Reinício falhou às 08:20",
-        },
-        {
-          name: "processor",
-          image: "papem/processor:2.1",
-          replicas: 2,
-          state: "running",
-          ports: [],
-          lastEvent: "Processando lote desde 08:15",
-        },
-        {
-          name: "ui",
-          image: "papem/analytics-ui:1.8",
-          replicas: 1,
-          state: "running",
-          ports: ["5173:80"],
-          lastEvent: "Último deploy às 07:50",
-        },
-      ],
-    });
-
-    this.containerStacks.set("stack-monitoring", {
-      id: "stack-monitoring",
-      name: "Monitoring",
-      projectName: "papem-monitoring",
-      path: "/opt/monitoring/docker-compose.yml",
-      status: "stopped",
-      updatedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
-      lastAction: "Stack pausado para manutenção",
-      primaryServerId: "server-4",
-      services: [
-        {
-          name: "prometheus",
-          image: "prom/prometheus:v2.53",
-          replicas: 1,
-          state: "stopped",
-          ports: ["9090:9090"],
-          lastEvent: "Serviço interrompido às 06:00",
-        },
-        {
-          name: "grafana",
-          image: "grafana/grafana:10.2",
-          replicas: 1,
-          state: "stopped",
-          ports: ["3000:3000"],
-          lastEvent: "Pausa agendada às 06:00",
-        },
-      ],
-    });
 
     this.serviceProcesses.set("svc-nginx", {
       id: "svc-nginx",
@@ -764,100 +660,47 @@ export class MemStorage implements IStorage {
   }
 
   async getContainerStacks(): Promise<ContainerStack[]> {
-    return Array.from(this.containerStacks.values()).sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-    );
+    try {
+      return await listDockerStacks();
+    } catch (error) {
+      if (error instanceof DockerUnavailableError) {
+        throw error;
+      }
+      throw new Error(`Não foi possível listar os containers: ${(error as Error).message}`);
+    }
   }
 
   async performContainerAction(id: string, action: ContainerActionInput): Promise<ContainerStack | undefined> {
-    const stack = this.containerStacks.get(id);
-    if (!stack) return undefined;
-
-    const now = new Date();
-    const targetNames = action.services?.length
-      ? new Set(action.services)
-      : new Set(stack.services.map(service => service.name));
-    let matchedServices = 0;
-
-    const updatedServices = stack.services.map(service => {
-      if (!targetNames.has(service.name)) {
-        return service;
+    let updatedStack: ContainerStack | undefined;
+    try {
+      updatedStack = await performDockerStackAction(id, action);
+    } catch (error) {
+      if (error instanceof DockerUnavailableError) {
+        throw error;
       }
-
-      matchedServices += 1;
-      let state = service.state;
-      let lastEvent = service.lastEvent;
-
-      switch (action.action) {
-        case "up":
-          state = "running";
-          lastEvent = `Serviço iniciado às ${now.toLocaleTimeString()}`;
-          break;
-        case "down":
-          state = "stopped";
-          lastEvent = `Serviço interrompido às ${now.toLocaleTimeString()}`;
-          break;
-        case "restart":
-          state = "running";
-          lastEvent = `Serviço reiniciado às ${now.toLocaleTimeString()}`;
-          break;
-        case "pull":
-          state = service.state;
-          lastEvent = `Imagem atualizada às ${now.toLocaleTimeString()}`;
-          break;
-      }
-
-      return {
-        ...service,
-        state,
-        lastEvent,
-      };
-    });
-
-    const affectedCount = matchedServices || action.services?.length || stack.services.length;
-
-    let status: ContainerStack["status"] = stack.status;
-    let lastAction: string;
-    switch (action.action) {
-      case "up":
-        status = "running";
-        lastAction = `Stack iniciado (${affectedCount} serviço(s))`;
-        break;
-      case "down":
-        status = "stopped";
-        lastAction = `Stack interrompido (${affectedCount} serviço(s))`;
-        break;
-      case "restart":
-        status = "running";
-        lastAction = `Stack reiniciado (${affectedCount} serviço(s))`;
-        break;
-      case "pull":
-        status = stack.status === "stopped" ? "stopped" : "running";
-        lastAction = `Imagens atualizadas (${affectedCount} serviço(s))`;
-        break;
-      default:
-        lastAction = "Ação executada";
-        break;
+      throw new Error(`Falha ao executar ação no stack ${id}: ${(error as Error).message}`);
+    }
+    if (!updatedStack) {
+      return undefined;
     }
 
-    const updatedStack: ContainerStack = {
-      ...stack,
-      status,
-      services: updatedServices,
-      updatedAt: now,
-      lastAction,
-    };
+    const affectedCount = action.services?.length ?? updatedStack.services.length;
+    const lastAction = updatedStack.lastAction ?? "Ação executada";
+    const status = action.action === "down" ? "warning" : "ok";
 
-    this.containerStacks.set(id, updatedStack);
-
-    await this.recordTelemetryEvent({
-      serverId: stack.primaryServerId ?? id,
-      metric: `container.${action.action}`,
-      value: affectedCount,
-      unit: "serviços",
-      status: action.action === "down" ? "warning" : "ok",
-      message: `${stack.name}: ${lastAction}`,
-    });
+    try {
+      await this.recordTelemetryEvent({
+        serverId: id,
+        metric: `container.${action.action}`,
+        value: affectedCount,
+        unit: "serviços",
+        status,
+        message: `${updatedStack.name}: ${lastAction}`,
+      });
+    } catch (error) {
+      // Telemetry failures should not block container actions
+      console.error("Failed to record telemetry for container action", error);
+    }
 
     return updatedStack;
   }
