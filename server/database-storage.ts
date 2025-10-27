@@ -20,6 +20,7 @@ import {
   type ServerWithMetrics,
   type PublicServer,
   type PublicServerWithMetrics,
+  type ContainerService,
   type ContainerStack,
   type ContainerActionInput,
   type ServiceProcess,
@@ -35,9 +36,10 @@ import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 import { IStorage } from "./storage";
 import { randomUUID } from "crypto";
+import { DockerEngine, type DockerContainerSummary } from "./docker-engine";
 
 export class DatabaseStorage implements IStorage {
-  private containerStacks = new Map<string, ContainerStack>();
+  private readonly dockerEngine = new DockerEngine();
   private serviceProcesses = new Map<string, ServiceProcess>();
   private backupJobs: BackupJob[] = [];
   private logExportTasks: LogExportTask[] = [];
@@ -56,109 +58,6 @@ export class DatabaseStorage implements IStorage {
 
   private initializeOperationalData() {
     const now = new Date();
-
-    this.containerStacks.set("stack-papem", {
-      id: "stack-papem",
-      name: "PAPEM Core",
-      projectName: "papem-core",
-      path: "/opt/papem/docker-compose.yml",
-      status: "running",
-      updatedAt: new Date(now.getTime() - 5 * 60 * 1000),
-      lastAction: "Stack iniciado automaticamente",
-      primaryServerId: "server-1",
-      services: [
-        {
-          name: "api",
-          image: "papem/api:latest",
-          replicas: 2,
-          state: "running",
-          ports: ["8080:8080", "8443:8443"],
-          lastEvent: "Deploy aplicado há 10 minutos",
-        },
-        {
-          name: "worker",
-          image: "papem/worker:latest",
-          replicas: 1,
-          state: "running",
-          ports: [],
-          lastEvent: "Fila processada às 08:45",
-        },
-        {
-          name: "proxy",
-          image: "nginx:1.25",
-          replicas: 1,
-          state: "running",
-          ports: ["80:80", "443:443"],
-          lastEvent: "Reload executado às 08:40",
-        },
-      ],
-    });
-
-    this.containerStacks.set("stack-analytics", {
-      id: "stack-analytics",
-      name: "Analytics",
-      projectName: "papem-analytics",
-      path: "/srv/analytics/docker-compose.yml",
-      status: "degraded",
-      updatedAt: new Date(now.getTime() - 15 * 60 * 1000),
-      lastAction: "Serviço collector com falha",
-      primaryServerId: "server-3",
-      services: [
-        {
-          name: "collector",
-          image: "papem/collector:2.1",
-          replicas: 3,
-          state: "error",
-          ports: ["9000:9000"],
-          lastEvent: "Reinício falhou às 08:20",
-        },
-        {
-          name: "processor",
-          image: "papem/processor:2.1",
-          replicas: 2,
-          state: "running",
-          ports: [],
-          lastEvent: "Processando lote desde 08:15",
-        },
-        {
-          name: "ui",
-          image: "papem/analytics-ui:1.8",
-          replicas: 1,
-          state: "running",
-          ports: ["5173:80"],
-          lastEvent: "Último deploy às 07:50",
-        },
-      ],
-    });
-
-    this.containerStacks.set("stack-monitoring", {
-      id: "stack-monitoring",
-      name: "Monitoring",
-      projectName: "papem-monitoring",
-      path: "/opt/monitoring/docker-compose.yml",
-      status: "stopped",
-      updatedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
-      lastAction: "Stack pausado para manutenção",
-      primaryServerId: "server-4",
-      services: [
-        {
-          name: "prometheus",
-          image: "prom/prometheus:v2.53",
-          replicas: 1,
-          state: "stopped",
-          ports: ["9090:9090"],
-          lastEvent: "Serviço interrompido às 06:00",
-        },
-        {
-          name: "grafana",
-          image: "grafana/grafana:10.2",
-          replicas: 1,
-          state: "stopped",
-          ports: ["3000:3000"],
-          lastEvent: "Pausa agendada às 06:00",
-        },
-      ],
-    });
 
     this.serviceProcesses.set("svc-nginx", {
       id: "svc-nginx",
@@ -518,102 +417,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContainerStacks(): Promise<ContainerStack[]> {
-    return Array.from(this.containerStacks.values()).sort(
-      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-    );
+    const stacks = await this.loadDockerStacks();
+    return stacks.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async performContainerAction(id: string, action: ContainerActionInput): Promise<ContainerStack | undefined> {
-    const stack = this.containerStacks.get(id);
-    if (!stack) return undefined;
-
-    const now = new Date();
-    const targetNames = action.services?.length
-      ? new Set(action.services)
-      : new Set(stack.services.map(service => service.name));
-    let matchedServices = 0;
-
-    const updatedServices = stack.services.map(service => {
-      if (!targetNames.has(service.name)) {
-        return service;
-      }
-
-      matchedServices += 1;
-      let state = service.state;
-      let lastEvent = service.lastEvent;
-
-      switch (action.action) {
-        case "up":
-          state = "running";
-          lastEvent = `Serviço iniciado às ${now.toLocaleTimeString()}`;
-          break;
-        case "down":
-          state = "stopped";
-          lastEvent = `Serviço interrompido às ${now.toLocaleTimeString()}`;
-          break;
-        case "restart":
-          state = "running";
-          lastEvent = `Serviço reiniciado às ${now.toLocaleTimeString()}`;
-          break;
-        case "pull":
-          state = service.state;
-          lastEvent = `Imagem atualizada às ${now.toLocaleTimeString()}`;
-          break;
-      }
-
-      return {
-        ...service,
-        state,
-        lastEvent,
-      };
-    });
-
-    const affectedCount = matchedServices || action.services?.length || stack.services.length;
-
-    let status: ContainerStack["status"] = stack.status;
-    let lastAction: string;
-    switch (action.action) {
-      case "up":
-        status = "running";
-        lastAction = `Stack iniciado (${affectedCount} serviço(s))`;
-        break;
-      case "down":
-        status = "stopped";
-        lastAction = `Stack interrompido (${affectedCount} serviço(s))`;
-        break;
-      case "restart":
-        status = "running";
-        lastAction = `Stack reiniciado (${affectedCount} serviço(s))`;
-        break;
-      case "pull":
-        status = stack.status === "stopped" ? "stopped" : "running";
-        lastAction = `Imagens atualizadas (${affectedCount} serviço(s))`;
-        break;
-      default:
-        lastAction = "Ação executada";
-        break;
+    if (!this.dockerEngine.isAvailable) {
+      throw new Error("Docker engine is not accessible from this environment");
     }
 
-    const updatedStack: ContainerStack = {
+    const containers = await this.dockerEngine.listContainers();
+    const stackContainers = containers.filter(container => this.resolveStackId(container) === id);
+    if (stackContainers.length === 0) {
+      return undefined;
+    }
+
+    const targetContainers = this.filterContainersByService(stackContainers, action.services);
+    if (targetContainers.length === 0) {
+      return undefined;
+    }
+
+    for (const container of targetContainers) {
+      try {
+        await this.applyContainerAction(container, action.action);
+      } catch (error) {
+        throw new Error(
+          `Failed to execute ${action.action} for container ${container.Names?.[0] ?? container.Id}: ${(error as Error).message}`,
+        );
+      }
+    }
+
+    const updatedStacks = await this.loadDockerStacks();
+    const stack = updatedStacks.find(entry => entry.id === id);
+    if (!stack) {
+      return undefined;
+    }
+
+    const affectedCount = targetContainers.length;
+    const lastAction = this.describeContainerAction(action.action, affectedCount);
+    const result: ContainerStack = {
       ...stack,
-      status,
-      services: updatedServices,
-      updatedAt: now,
+      updatedAt: new Date(),
       lastAction,
     };
 
-    this.containerStacks.set(id, updatedStack);
-
     await this.recordTelemetryEvent({
-      serverId: stack.primaryServerId ?? id,
+      serverId: result.primaryServerId ?? result.id,
       metric: `container.${action.action}`,
       value: affectedCount,
-      unit: "serviços",
+      unit: "containers",
       status: action.action === "down" ? "warning" : "ok",
-      message: `${stack.name}: ${lastAction}`,
+      message: `${result.name}: ${lastAction}`,
     });
 
-    return updatedStack;
+    return result;
   }
 
   async getServiceProcesses(): Promise<ServiceProcess[]> {
@@ -837,5 +694,231 @@ export class DatabaseStorage implements IStorage {
   async deleteLogMonitoringConfig(id: string): Promise<boolean> {
     const result = await db.delete(logMonitoringConfig).where(eq(logMonitoringConfig.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  private async loadDockerStacks(): Promise<ContainerStack[]> {
+    if (!this.dockerEngine.isAvailable) {
+      return [];
+    }
+
+    const containers = await this.dockerEngine.listContainers();
+    if (!containers.length) {
+      return [];
+    }
+
+    const grouped = new Map<string, DockerContainerSummary[]>();
+    for (const container of containers) {
+      const stackId = this.resolveStackId(container);
+      if (!grouped.has(stackId)) {
+        grouped.set(stackId, []);
+      }
+      grouped.get(stackId)!.push(container);
+    }
+
+    return Array.from(grouped.entries()).map(([stackId, entries]) =>
+      this.buildStackFromContainers(stackId, entries),
+    );
+  }
+
+  private resolveStackId(container: DockerContainerSummary): string {
+    const project = container.Labels?.["com.docker.compose.project"];
+    if (project) {
+      return project;
+    }
+    const name = container.Names?.[0]?.replace(/^\//, "");
+    return name ?? container.Id.slice(0, 12);
+  }
+
+  private resolveServiceName(container: DockerContainerSummary): string {
+    const composeService = container.Labels?.["com.docker.compose.service"];
+    if (composeService) {
+      return composeService;
+    }
+    const name = container.Names?.[0]?.replace(/^\//, "");
+    return name ?? container.Id.slice(0, 12);
+  }
+
+  private filterContainersByService(
+    containers: DockerContainerSummary[],
+    services?: string[],
+  ): DockerContainerSummary[] {
+    if (!services || services.length === 0) {
+      return containers;
+    }
+
+    const normalized = new Set(services.map(service => service.toLowerCase()));
+    return containers.filter(container =>
+      normalized.has(this.resolveServiceName(container).toLowerCase()),
+    );
+  }
+
+  private async applyContainerAction(
+    container: DockerContainerSummary,
+    action: ContainerActionInput["action"],
+  ): Promise<void> {
+    switch (action) {
+      case "up":
+        await this.dockerEngine.startContainer(container.Id);
+        break;
+      case "down":
+        await this.dockerEngine.stopContainer(container.Id);
+        break;
+      case "restart":
+        await this.dockerEngine.restartContainer(container.Id);
+        break;
+      case "pull":
+        await this.dockerEngine.pullImage(container.Image);
+        break;
+      default:
+        throw new Error(`Unsupported container action: ${action}`);
+    }
+  }
+
+  private describeContainerAction(
+    action: ContainerActionInput["action"],
+    count: number,
+  ): string {
+    const suffix = count === 1 ? "container" : "containers";
+    switch (action) {
+      case "up":
+        return `Iniciado ${count} ${suffix}`;
+      case "down":
+        return `Interrompido ${count} ${suffix}`;
+      case "restart":
+        return `Reiniciado ${count} ${suffix}`;
+      case "pull":
+        return `Imagem atualizada para ${count} ${suffix}`;
+      default:
+        return `${action} executado em ${count} ${suffix}`;
+    }
+  }
+
+  private buildStackFromContainers(
+    stackId: string,
+    containers: DockerContainerSummary[],
+  ): ContainerStack {
+    const primary = containers[0];
+    const projectName = primary.Labels?.["com.docker.compose.project"] ?? stackId;
+    const displayName = this.formatDisplayName(projectName);
+    const servicesByName = new Map<
+      string,
+      {
+        image: string;
+        replicas: number;
+        states: ContainerService["state"][];
+        ports: Set<string>;
+        events: string[];
+      }
+    >();
+
+    for (const container of containers) {
+      const serviceName = this.resolveServiceName(container);
+      const entry = servicesByName.get(serviceName) ?? {
+        image: container.Image,
+        replicas: 0,
+        states: [],
+        ports: new Set<string>(),
+        events: [],
+      };
+
+      entry.replicas += 1;
+      entry.image = container.Image;
+      entry.states.push(this.mapContainerState(container.State));
+      entry.events.push(container.Status ?? "");
+
+      for (const port of container.Ports ?? []) {
+        if (!port.PrivatePort) continue;
+        const publicPort = port.PublicPort ? `${port.PublicPort}:` : "";
+        entry.ports.add(`${publicPort}${port.PrivatePort}/${port.Type}`);
+      }
+
+      servicesByName.set(serviceName, entry);
+    }
+
+    const services: ContainerService[] = Array.from(servicesByName.entries())
+      .map(([name, data]) => ({
+        name,
+        image: data.image,
+        replicas: data.replicas,
+        state: this.aggregateServiceState(data.states),
+        ports: Array.from(data.ports).sort(),
+        lastEvent: data.events.find(event => event.length > 0) ?? "",
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      id: stackId,
+      name: displayName,
+      projectName,
+      path: this.resolveStackPath(primary),
+      status: this.aggregateStackStatus(services),
+      updatedAt: new Date(),
+      services,
+      lastAction: primary.Status ?? undefined,
+    };
+  }
+
+  private mapContainerState(state?: string): ContainerService["state"] {
+    switch (state) {
+      case "running":
+        return "running";
+      case "restarting":
+        return "restarting";
+      case "paused":
+      case "created":
+      case "exited":
+        return "stopped";
+      case "dead":
+      case "removing":
+        return "error";
+      default:
+        return "error";
+    }
+  }
+
+  private aggregateServiceState(states: ContainerService["state"][]): ContainerService["state"] {
+    if (states.every(state => state === "running")) {
+      return "running";
+    }
+    if (states.every(state => state === "stopped")) {
+      return "stopped";
+    }
+    if (states.includes("restarting")) {
+      return "restarting";
+    }
+    return "error";
+  }
+
+  private aggregateStackStatus(services: ContainerService[]): ContainerStack["status"] {
+    if (services.length === 0) {
+      return "stopped";
+    }
+    if (services.every(service => service.state === "running")) {
+      return "running";
+    }
+    if (services.every(service => service.state === "stopped")) {
+      return "stopped";
+    }
+    return "degraded";
+  }
+
+  private resolveStackPath(container: DockerContainerSummary): string {
+    const configFiles = container.Labels?.["com.docker.compose.project.config_files"];
+    if (configFiles) {
+      return configFiles.split(",")[0];
+    }
+    const workingDir = container.Labels?.["com.docker.compose.project.working_dir"];
+    if (workingDir) {
+      return workingDir;
+    }
+    return container.Names?.[0]?.replace(/^\//, "") ?? container.Id.slice(0, 12);
+  }
+
+  private formatDisplayName(value: string): string {
+    return value
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, char => char.toUpperCase());
   }
 }
