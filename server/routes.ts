@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { DockerUnavailableError } from "./docker";
 import {
   insertServerSchema,
   insertMetricsSchema,
@@ -256,6 +257,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stacks = await storage.getContainerStacks();
       res.json(stacks);
     } catch (error) {
+      if (error instanceof DockerUnavailableError) {
+        return res.status(503).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to fetch container stacks" });
     }
   });
@@ -271,6 +275,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof ZodError) {
         return res.status(400).json({ message: "Invalid container action payload" });
+      }
+      if (error instanceof DockerUnavailableError) {
+        return res.status(503).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to execute container action" });
     }
