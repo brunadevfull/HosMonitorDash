@@ -36,12 +36,20 @@ export function useWebSocket(): UseWebSocketReturn {
       try {
         // Allow both full websocket urls and http(s) urls via configuration
         const provided = new URL(explicitUrl, window.location.href);
+        const originalSearch = provided.search;
+        const originalHash = provided.hash;
+
         if (provided.protocol.startsWith("http")) {
           provided.protocol = provided.protocol === "https:" ? "wss:" : "ws:";
         }
         if (!provided.pathname || provided.pathname === "/") {
           provided.pathname = "/ws";
         }
+
+        // Restore any tokens or routing information supplied through the query/hash
+        provided.search = originalSearch;
+        provided.hash = originalHash;
+
         return provided.toString();
       } catch (error) {
         console.error("Invalid VITE_WS_URL provided:", explicitUrl, error);
