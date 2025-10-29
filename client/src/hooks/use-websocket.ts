@@ -26,11 +26,61 @@ export function useWebSocket(): UseWebSocketReturn {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
 
+  const resolveWebSocketUrl = () => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const explicitUrl = import.meta.env.VITE_WS_URL as string | undefined;
+    if (explicitUrl) {
+      try {
+        // Allow both full websocket urls and http(s) urls via configuration
+        const provided = new URL(explicitUrl, window.location.href);
+        if (provided.protocol.startsWith("http")) {
+          provided.protocol = provided.protocol === "https:" ? "wss:" : "ws:";
+        }
+        if (!provided.pathname || provided.pathname === "/") {
+          provided.pathname = "/ws";
+        }
+        provided.search = "";
+        provided.hash = "";
+        return provided.toString();
+      } catch (error) {
+        console.error("Invalid VITE_WS_URL provided:", explicitUrl, error);
+      }
+    }
+
+    const httpBase = import.meta.env.VITE_API_URL as string | undefined;
+    if (httpBase) {
+      try {
+        const apiUrl = new URL(httpBase, window.location.href);
+        apiUrl.protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+        apiUrl.pathname = "/ws";
+        apiUrl.search = "";
+        apiUrl.hash = "";
+        return apiUrl.toString();
+      } catch (error) {
+        console.error("Invalid VITE_API_URL provided:", httpBase, error);
+      }
+    }
+
+    const wsUrl = new URL(window.location.href);
+    wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+    wsUrl.pathname = "/ws";
+    wsUrl.search = "";
+    wsUrl.hash = "";
+    return wsUrl.toString();
+  };
+
   const connect = useCallback(() => {
     try {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      
+      const wsUrl = resolveWebSocketUrl();
+
+      if (!wsUrl) {
+        console.error("Unable to resolve WebSocket URL");
+        return;
+      }
+
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
