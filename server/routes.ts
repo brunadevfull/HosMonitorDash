@@ -383,7 +383,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // WebSocket server for real-time updates
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ noServer: true });
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    try {
+      const { url = '/' } = request;
+      const host = request.headers.host ?? 'localhost';
+      const parsedUrl = new URL(url, `http://${host}`);
+
+      if (parsedUrl.pathname !== '/ws') {
+        const hasAdditionalUpgradeListeners = httpServer.listenerCount('upgrade') > 1;
+        if (!hasAdditionalUpgradeListeners) {
+          socket.destroy();
+        }
+        return;
+      }
+
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } catch (error) {
+      console.error('Failed to handle WebSocket upgrade:', error);
+      socket.destroy();
+    }
+  });
 
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
