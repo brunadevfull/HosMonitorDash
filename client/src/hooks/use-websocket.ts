@@ -42,8 +42,6 @@ export function useWebSocket(): UseWebSocketReturn {
         if (!provided.pathname || provided.pathname === "/") {
           provided.pathname = "/ws";
         }
-        provided.search = "";
-        provided.hash = "";
         return provided.toString();
       } catch (error) {
         console.error("Invalid VITE_WS_URL provided:", explicitUrl, error);
